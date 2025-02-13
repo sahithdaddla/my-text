@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard Punch</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #fafafa;
+            color: #0f172a;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .dashboard-header {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            padding: 1rem 2rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .dashboard-title {
+            font-size: 2.5rem;
+            color: white;
+        }
+
+        .clear-button {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 0.75rem 2rem;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .employee-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 2rem;
+            padding: 0 2rem;
+        }
+
+        .employee-card {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            cursor: pointer;
+        }
+
+        .employee-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .employee-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .employee-id {
+            font-size: 1rem;
+            color: #64748b;
+        }
+
+        .status-badge {
+            padding: 0.75rem 1.5rem;
+            border-radius: 30px;
+            font-size: 0.875rem;
+            position: relative;
+            width: 46%;
+        }
+
+        .status-in {
+            background: #34d399;
+            color: white;
+        }
+
+        .status-out {
+            background: #fb923c;
+            color: white;
+        }
+
+        .employee-detail-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .employee-detail-overlay.active {
+            display: flex;
+        }
+
+        .employee-detail-card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            color: #4a5568;
+            cursor: pointer;
+            padding: 5px;
+            font-size: 1.5rem;
+        }
+
+        .time-record {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .time-label {
+            font-size: 0.875rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .time-value {
+            font-weight: 500;
+            font-size: 1.125rem;
+        }
+
+        .duration {
+            color: #48bb78;
+            font-weight: 600;
+        }
+    </style>
+</head>d
+<body>
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">ADMIN ATTENDANCE</h1>
+        <button class="clear-button" onclick="showModal()">Clear All Records</button>
+    </div>
+
+    <!-- Employee Grid -->
+    <div id="employeeGrid" class="employee-grid"></div>
+
+    <!-- Add Employee Detail Overlay -->
+    <div class="employee-detail-overlay" id="employeeDetailOverlay">
+        <div class="employee-detail-card">
+            <div class="detail-header">
+                <h2 class="employee-detail-title">Employee Details</h2>
+                <button class="close-button" onclick="hideEmployeeDetail()">×</button>
+            </div>
+            <div class="detail-info" id="employeeDetailContent"></div>
+        </div>
+    </div>
+
+    <script>
+        function calculateDuration(inTime, outTime) {
+            if (!inTime || !outTime) return 'N/A';
+            const start = new Date(`1970/01/01 ${inTime}`);
+            const end = new Date(`1970/01/01 ${outTime}`);
+            const diff = end - start;
+            const hours = Math.floor(diff / 3600000);
+            const minutes = Math.floor((diff % 3600000) / 60000);
+            return `${hours}h ${minutes}m`;
+        }
+
+        function getDayName(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { weekday: 'long' });
+        }
+
+        function showEmployeeDetail(employeeId) {
+            const records = JSON.parse(localStorage.getItem('punchRecords') || '[]');
+            const employeeRecords = records.filter(record => record.id === employeeId);
+
+            if (employeeRecords.length === 0) return;
+
+            const latestRecord = employeeRecords[employeeRecords.length - 1];
+            const dayRecords = new Map();
+
+            employeeRecords.forEach(record => {
+                if (!dayRecords.has(record.date)) {
+                    dayRecords.set(record.date, {
+                        date: record.date,
+                        day: getDayName(record.date),
+                        inTime: record.status === 'in' ? record.timestamp : null,
+                        outTime: record.status === 'out' ? record.timestamp : null
+                    });
+                } else {
+                    const dayRecord = dayRecords.get(record.date);
+                    if (record.status === 'in') dayRecord.inTime = record.timestamp;
+                    if (record.status === 'out') dayRecord.outTime = record.timestamp;
+                }
+            });
+
+            const detailContent = document.getElementById('employeeDetailContent');
+            detailContent.innerHTML = `
+                <div>
+                    <div><strong>Employee Name:</strong> ${latestRecord.name}</div>
+                    <div><strong>Employee ID:</strong> ${latestRecord.id}</div>
+                </div>
+                <h3>Attendance Records</h3>
+                ${Array.from(dayRecords.values()).reverse().map(record => `
+                    <div class="time-record">
+                        <div><strong>Date:</strong> ${record.date}</div>
+                        <div><strong>Day:</strong> ${record.day}</div>
+                        <div><strong>Punch In:</strong> ${record.inTime || 'N/A'}</div>
+                        <div><strong>Punch Out:</strong> ${record.outTime || 'N/A'}</div>
+                        <div><strong>Duration:</strong> ${calculateDuration(record.inTime, record.outTime)}</div>
+                    </div>
+                `).join('')}
+            `;
+
+            const overlay = document.getElementById('employeeDetailOverlay');
+            overlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideEmployeeDetail() {
+            const overlay = document.getElementById('employeeDetailOverlay');
+            overlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        function updateEmployeeGrid() {
+            const records = JSON.parse(localStorage.getItem('punchRecords') || '[]');
+            const today = new Date().toLocaleDateString();
+            const latestRecords = new Map();
+
+            records.forEach(record => {
+                if (record.date === today) {
+                    latestRecords.set(record.id, record);
+                }
+            });
+
+            const employeeGrid = document.getElementById('employeeGrid');
+            employeeGrid.innerHTML = Array.from(latestRecords.values())
+                .map(record => `
+                    <div class="employee-card" onclick="showEmployeeDetail('${record.id}')">
+                        <div class="employee-info">
+                            <div class="employee-details">
+                                <h3 class="employee-name">${record.name}</h3>
+                                <p class="employee-id">ID: ${record.id}</p>
+                                <p>Last Update: ${record.timestamp}</p>
+                            </div>
+                            <div class="status-badge ${record.status === 'in' ? 'status-in' : 'status-out'}">
+                                <span>Punched ${record.status.charAt(0).toUpperCase() + record.status.slice(1)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        function showModal() {
+            const confirmClear = confirm("Are you sure you want to clear all records?");
+            if (confirmClear) {
+                clearRecords();
+            }
+        }
+
+        function clearRecords() {
+            localStorage.removeItem('punchRecords');
+            updateEmployeeGrid();
+            alert("All records have been cleared!");
+        }
+
+        // Initial call to populate the employee grid when the page loads
+        updateEmployeeGrid();
+    </script>
+</body>
+</html>
